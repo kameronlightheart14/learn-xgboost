@@ -91,6 +91,7 @@ To start with please review CreateFeatureVectors1.java.  This implementation is 
 
 *Question 1:* What percentage of input lines end up in the vector train and eval files?
 
+2260 / 2660 train (~85%) and 400 / 2660 eval (~15%)
 
 ### B. Training a model
 We want to train our first model and assess the accuracy of the model against the test set.  To do this you can run the py/train-simple.py script. First review the script, and note you need the necessary dependencies installed (see above).  Next, to train the model, run:
@@ -101,6 +102,7 @@ Notice we are loading the feature_names, and then the train and eval vector file
 
 *Question 2:* What is the accuracy of your model and how is accuracy computed?
 
+My model had an accuracy of 77.25% which was calculated by predicting labels for the eval set and calculating the percentage of correct labels.
 
 ### C. Building and refining features
 We really need to understand the data we are trying to represent to the machine to build the best model.  In looking at this data sample how can we better compare the target and sample?
@@ -121,9 +123,14 @@ What if instead of comparing whole name strings, we looked for the number of nam
 
 *Question 3:* How did the output vectors change?
 
+There are more features showing up on most lines, and some features have a score of 2+ instead of just 1.
+This must be the number of name parts that match.
+
      Train the model with the new vectors.
 
 *Question 4:* What was the accuracy with the improved name comparison?
+
+The accuracy is now 82.00% with the improved name comparison.
 
 Consider these questions:
 * Remember we just compared all fields exactly. What could we do better when representing the data to the classifier?
@@ -137,9 +144,14 @@ So far we have made a few observations. Simply comparing name strings doesn't be
 
 *Question 5:* What will happen with the differentNames clause uncommented?
 
+There will now be negative scores if all names differ, and penalties to even out when some names match but others don't.
+
      Create the new vectors and train the model.
 
 *Question 6:* Was the accuracy improved?  How much?  How is this implementation flawed?
+
+Yes, the accuracy is now 84.50%, so an improvement of 2.50%. This implementation doesn't account for when names are close to the same.
+For instance if there is a typo between the two like Harry vs Hary it will consider them as different and put a negative mark on the comparison.
 
 Next consider the dates in the input data.  Close inspection will show that often birth dates are estimates, based on age declared at the time the record is made.  So we need to come up with a way to represent year alignment that is close - and let the machine learn which cases it should pay attention to that.  We have already called out the date fields in CreateFeatureVectors2.java (DATE_FIELDS = {10, 24, 38, 66}).
 
@@ -149,10 +161,13 @@ Remember that 0 is the default value, and means no data.  So how will we represe
 
 *Question 7:* What value will the date fields contain if the year differs by 1?  What about if they differ by 2, or 5?
 
+If the years differ by 1, the result will be 4, 2 will result in 3 and 5 will result in 0.
+
      Run CreateFeatureVectors2.java after uncommenting the code that compares the years into buckets and train a new model.
 
 *Question 8:* What is the accuracy now?  How could you improve this bucketing?
 
+The accuracy is now 85.00%. Maybe instead of just 0 if the difference is greater than 5, you could have negative values that get more negative the further apart the years are.
 
 ### D. Analyzing the model
 We have been using the accuracy at 50% probability to measure our progress by running the train-simple.py script, but there are lots of other ways to analyze our model.  Also, accuracy might be better if we choose to look at a different probability threshold.  Please take some time and review the train.py script.  You will see it contains the same train and predict from the train-simple.py script, but there are additional modules loaded.  There is logging and artifact collection using mlflow.  There are additional analysis tools setup - and we have the results at each training iteration.
@@ -165,7 +180,11 @@ The train.py script will present a number of graphs: Error rates for each iterat
 
 *Question 9:* What are the three most important features of your model?
 
+Birth year, Spouse name and Person name .
+
 *Question 10:* Where in the first decision tree plot do you expect your most important feature to be?  Where is it actually, and why?
+
+I would expect them to be close to the root (top) of the tree. The person name is the root as expected, but birth year is near the leaves and spouse name doesn't appear to be on the tree at all. I'm not sure why, it is only the first iteration, so it will improve. 
 
 Note: You can modify the 'num_trees' argument in xgb.plot_tree to see the decision tree plot for other iterations.  This gives you some idea of what is happening with each new iteration.  The classifier runs over all the decision trees by default - but you can run it only up to any number of trees in your saved model with additional parameters.
 
@@ -178,6 +197,8 @@ Xgboost has an [early stopping rounds](https://xgboost.readthedocs.io/en/latest/
      Find the 'early_stopping_rounds' line in train.py, and exchange that line for the one above it.  Try your training again.
 
 *Question 11:* What iteration did your model stop on?  Was your accuracy improved?
+
+The model stopped on iteration 319, the accuracy was unchanged.
 
 The Precision/Recall graph shows the tension between getting all the answers right, and getting answers for all the questions.  You can find an optimal point on the curve where you maximize precision or recall, or maybe you want to balance them.  Then you can find on that curve what the precision threshold is at that point.  If you are interested in pursuing threshold analysis you can look into the data behind the P/R curve.
 
@@ -216,10 +237,13 @@ We are going to experiment with the max_depth option.  This controls the depth o
 
 *Question 12:* How is your accuracy and tree impacted by this change?
 
+The accuracy improved by 1.25% to 86.25%, and the tree got much deeper and wider.
+
      Try adjusting max_depth some more.
 
 *Question 13:* How is your accuracy and tree impacted by this change?  Did you find an optimal max_depth?
 
+The changes were pretty subtle, within 1-2% change. The optimal max_depth appeared to be 8 with an accuracy of 87.25%.
 
 ### F. Building your data-science superpowers
 Doing all these experiments requires some scientific rigor to understand what is changing, and to track results.  Along the way each training run has been logging the results into an artifact directory, but also the parameters, metrics and artifacts have been logged into [mlflow](https://mlflow.org/) locally.  This is an open-source tool for tracking machine learning and experimenting through the development life-cycle.  We will just be demonstrating a small portion of the functionality - logging training parameters, metrics and artifacts.
@@ -232,6 +256,7 @@ This will startup a local mlflow UI at http://127.0.0.1:5000 that you can open i
 
 *Question 14:* What might be useful here in comparing training runs?
 
+It would be nice to not have to remember which model parameters led to the best accuracy, precision-recall, etc. Instead, running many different parameter changes and then looking at the results afterwards using this ui would be super useful.
 
 ### G. Choose your own adventure
 We only scratched the surface of feature development and fitting those features to the machine.  Xgboost allows you to bundle features so they have to stay together, and provide weights to help emphasize what is important.  There are many other ways to better represent our problem, and you might already have noticed a few.  For one, we are only comparing similar fields to each other.  What if the target has a birth date, but the candidate does not - but the candidate has a child marriage date and the target does not.  Could you add a feature that would expose that information to the machine and see if it helps improve things?
@@ -239,6 +264,8 @@ We only scratched the surface of feature development and fitting those features 
      The final activity is to develop a feature or find another way to improve the accuracy of our example code.
 
 *Question 15:* What feature did you develop or optimize?  How much did it help improve your model?
+
+I changed the difference in year feature to have negative values for differences above 5 years. This got the accuracy to hit 87.50%. Not much of an improvement, but it was a subtle change, so it was expected.
 
 In summary:
 * Getting good labeled data to represent your problem is often the hardest thing
